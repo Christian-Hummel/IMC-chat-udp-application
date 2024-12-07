@@ -3,6 +3,7 @@
 import socket
 import threading
 import sys
+import time
 
 
 
@@ -40,8 +41,7 @@ def send(host, message: bytes):
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
 
         s.sendto(message, (host,CLIENT_PORT))
-        reply = s.recv(1024)
-        return repr(reply)
+
 
 
 def receive():
@@ -64,27 +64,35 @@ if __name__ == "__main__":
     if len(sys.argv) != 3:
         show_usage()
 
-    t = threading.Thread(target=receive)
-    t.start()
+    # t = threading.Thread(target=receive)
+    # t.start()
 
 
-    daemon_ip = sys.argv[1]
+    daemon_ip_request = sys.argv[1]
+    daemon_ip = "" + daemon_ip_request
+    print(f"daemon_ip_request {daemon_ip_request}")
 
-    if connect(daemon_ip):
-        print(f"Successfully connected to daemon with ip {daemon_ip}")
+    if connect(daemon_ip_request):
+        print(f"Successfully connected to daemon with ip {daemon_ip_request}")
 
 
         while True:
+            receive()
             message = input("Enter your message")
 
-            # socket error here
 
             if message == "!q":
                 sys.exit()
 
             else:
-                with client_sock as s:
-                    s.sendto(message.encode(), (daemon_ip,CLIENT_PORT))
+                send(daemon_ip, message.encode())
+
+                # socket error here for simp_daemon
+
+                pass
+
+
+
 
     else:
         print(f"failed to connect to {daemon_ip}")
