@@ -23,7 +23,8 @@ class ExampleDaemon:
         self.client_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.daemon_sock.bind((self.ip_address,self.DAEMON_PORT))
         self.client_sock.bind((self.ip_address,self.CLIENT_PORT))
-        self.connection = 0
+        self.daemon_connection = False
+        self.client_connection = False
 
     def start(self):
         print(f"Daemon running at {self.ip_address}")
@@ -38,18 +39,34 @@ class ExampleDaemon:
         client_thread.join()
 
 
+    def connection_request(self, msg, ip_address):
+
+
+        if not self.client_connection and msg == b'connectionrequest':
+            message = b'connected'
+            self.client_sock.sendto(message, (ip_address, CLIENT_PORT))
+            self.client_connection = True
+            return True
+        else:
+            return False
+
+
+
+
     def daemon_listen(self):
         print(f"Listening for messages from daemons on port 7777 ")
 
         while True:
+
             data , host_from = self.daemon_sock.recvfrom(1024)
-            print('Connected by', host_from)
             address, _ = host_from
+            print('Connected by', host_from)
+            print(address)
             if not data:
                 break
             print('Sending back data: ', data)
             self.handshake(data, address)
-            print(f"connection status {self.connection}")
+            print(f"connection status {self.daemon_connection}")
 
 
 
@@ -61,14 +78,15 @@ class ExampleDaemon:
 
         while True:
             data , host_from = self.client_sock.recvfrom(1024)
-            print('Connected by', host_from)
+
             address, _ = host_from
-            print(address)
+            self.connection_request(data, address)
+            print(self.connection_request(data, address))
             if not data:
                 break
-            print('Sending back data: ', data)
-            self.handshake(data, address)
-            print(f"connection status {self.connection}")
+            # print('Sending back data: ', data)
+            # self.handshake(data, address)
+            # print(f"connection status {self.client_connection}")
 
     def client_message(self):
         pass
@@ -78,17 +96,17 @@ class ExampleDaemon:
 
     def handshake(self, message, address):
 
-        if message == b'0x02' and not self.connection:
+        if message == b'0x02' and not self.daemon_connection:
             self.daemon_sock.sendto(b'0x06',(address, DAEMON_PORT))
             # time.sleep(5)
             reply, _ = self.daemon_sock.recvfrom(1024)
             if reply == b'0x04':
-                self.connection = True
+                self.daemon_connection = True
                 print(f"connection established as a receiver with {address}")
 
 
 
-        elif message != b'0x02' and not self.connection:
+        elif message != b'0x02' and not self.daemon_connection:
             print(f" message {message} address {address}")
             self.daemon_sock.sendto(b'0x02', (address, DAEMON_PORT))
             # time.sleep(5)
@@ -96,19 +114,19 @@ class ExampleDaemon:
             if reply == b'0x06':
                 # time.sleep(5)
                 self.daemon_sock.sendto(b'0x04', (address, DAEMON_PORT))
-                self.connection = True
+                self.daemon_connection = True
                 print(f"connection established as a sender with {address}")
 
 
 
-        elif message == b'0x02' and self.connection:
+        elif message == b'0x02' and self.daemon_connection:
             # send error message - client busy
             # send FIN
             # continue
             pass
 
 
-        elif message == b'0x08' and self.connection:
+        elif message == b'0x08' and self.daemon_connection:
             # send FIN
             # timeout
             # self.connection = False

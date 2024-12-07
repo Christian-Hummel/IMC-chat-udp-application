@@ -6,8 +6,24 @@ import string
 import time
 
 CLIENT_PORT = 7778
-
+client_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 connection = False
+
+
+def connect(ip_address):
+
+    conn_test = b'connectionrequest'
+
+    try:
+        client_sock.sendto(conn_test, (ip_address,CLIENT_PORT))
+        data, _ = client_sock.recvfrom(1024)
+        if data == "connected":
+            connection = True
+        return True
+
+    except Exception:
+        return False
+
 
 
 
@@ -34,9 +50,9 @@ if __name__ == "__main__":
     if len(sys.argv) != 3:
         show_usage()
 
-    daemon_ip = int(input("Please insert the ip_address from your chat daemon "))
+    daemon_ip = input("Please insert the ip_address from your chat daemon ")
 
-    send(sys.argv[1], str.encode(sys.argv[2]))
+    print(connect(daemon_ip))
 
 
 
