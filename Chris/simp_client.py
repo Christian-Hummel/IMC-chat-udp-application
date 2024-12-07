@@ -1,25 +1,34 @@
 #!/usr/bin/env python3
 
 import socket
+import threading
 import sys
-import string
-import time
+
+
 
 CLIENT_PORT = 7778
 client_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-connection = False
+
+# client also need to be bound to an ip and port
+client_sock.bind(("127.0.0.1",CLIENT_PORT))
+
+
+
+
 
 
 def connect(ip_address):
 
+
     conn_test = b'connectionrequest'
 
     try:
-        client_sock.sendto(conn_test, (ip_address,CLIENT_PORT))
-        data, _ = client_sock.recvfrom(1024)
-        if data == "connected":
-            connection = True
-        return True
+
+        with client_sock as s:
+            s.sendto(conn_test, (ip_address,CLIENT_PORT))
+            data, _ = client_sock.recvfrom(1024)
+            if data.decode() == "connected":
+                return True
 
     except Exception:
         return False
@@ -27,7 +36,7 @@ def connect(ip_address):
 
 
 
-def send(host, message: bytes) -> string:
+def send(host, message: bytes):
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
 
         s.sendto(message, (host,CLIENT_PORT))
@@ -35,24 +44,59 @@ def send(host, message: bytes) -> string:
         return repr(reply)
 
 
-def receive(host) -> string:
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+def receive():
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
 
-        data, host_from = s.recvfrom(1024)
-        print(f"Received chat request from {host_from}")
+            data, host_from = s.recvfrom(1024)
+            print(f"Response from {host_from}: {data.decode()}")
+    except:
+        pass
+
+
 
 
 def show_usage():
-    print('Usage: simple_socket_client.py <host> <port> <message>')
+    print('Usage: simple_socket_client.py')
 
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
         show_usage()
 
-    daemon_ip = input("Please insert the ip_address from your chat daemon ")
+    t = threading.Thread(target=receive)
+    t.start()
 
-    print(connect(daemon_ip))
+
+    daemon_ip = sys.argv[1]
+
+    if connect(daemon_ip):
+        print(f"Successfully connected to daemon with ip {daemon_ip}")
+
+
+        while True:
+            message = input("Enter your message")
+
+            # socket error here
+
+            if message == "!q":
+                sys.exit()
+
+            else:
+                with client_sock as s:
+                    s.sendto(message.encode(), (daemon_ip,CLIENT_PORT))
+
+    else:
+        print(f"failed to connect to {daemon_ip}")
+        sys.exit()
+
+
+
+
+
+
+
+
 
 
 
