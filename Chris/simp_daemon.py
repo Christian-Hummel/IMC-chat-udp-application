@@ -42,11 +42,12 @@ class ExampleDaemon:
     def connection_request(self, msg, ip_address):
 
 
-        if not self.client_connection and msg == b'connectionrequest':
+        if not self.client_connection and msg.decode() == "connectionrequest":
             message = b'connected'
             self.client_sock.sendto(message, (ip_address, CLIENT_PORT))
             self.client_connection = True
             return True
+
         else:
             return False
 
@@ -73,20 +74,53 @@ class ExampleDaemon:
     def client_listen(self):
 
         print("Listening for messages from clients on port 7778")
-
-
-
+        iteration = 0
         while True:
-            data , host_from = self.client_sock.recvfrom(1024)
-
+            iteration += 1
+            print(f"iteration {iteration}")
+            data, host_from = self.client_sock.recvfrom(1024)
+            print(f"data {data}")
             address, _ = host_from
-            self.connection_request(data, address)
-            print(self.connection_request(data, address))
+
+            if data.decode() == "connectionrequest":
+                if not self.client_connection:
+
+                    self.connection_request(data, address)
+                    print(f"connection {self.client_connection}")
+                    continue
+
+
+                else:
+                    error = b'This daemon is already connected to a client'
+
+                    self.client_sock.sendto(error, (address, CLIENT_PORT))
+                    continue
+
+
+            elif data.decode() != "connectionrequest":
+
+                print(f"sending back data {data}")
+
+                self.client_sock.sendto(data, (address, CLIENT_PORT))
+                continue
+
+
+
             if not data:
+                self.client_connection = False
                 break
-            # print('Sending back data: ', data)
-            # self.handshake(data, address)
-            # print(f"connection status {self.client_connection}")
+                # print('Sending back data: ', data)
+                # self.handshake(data, address)
+                # print(f"connection status {self.client_connection}")
+
+
+
+
+
+
+
+
+
 
     def client_message(self):
         pass
