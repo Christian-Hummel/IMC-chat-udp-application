@@ -8,28 +8,24 @@ import time
 
 
 CLIENT_PORT = 7778
-client_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-# client also need to be bound to an ip and port
-client_sock.bind(("127.0.0.1",CLIENT_PORT))
 
 
 
 
 
 
-def connect(ip_address):
+
+def connect(ip_address, client_sock):
 
 
     conn_test = b'connectionrequest'
 
     try:
 
-        with client_sock as s:
-            s.sendto(conn_test, (ip_address,CLIENT_PORT))
-            data, _ = client_sock.recvfrom(1024)
-            if data.decode() == "connected":
-                return True
+        client_sock.sendto(conn_test, (ip_address,CLIENT_PORT))
+        data, _ = client_sock.recvfrom(1024)
+        if data.decode() == "connected":
+            return True
 
     except Exception:
         return False
@@ -37,19 +33,16 @@ def connect(ip_address):
 
 
 
-def send(host, message: bytes):
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+def send(host, message: bytes, client_sock):
 
-        s.sendto(message, (host,CLIENT_PORT))
-
+    client_sock.sendto(message, (host,CLIENT_PORT))
 
 
-def receive():
+
+def receive(client_sock):
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-
-            data, host_from = s.recvfrom(1024)
-            print(f"Response from {host_from}: {data.decode()}")
+        data, host_from = client_sock.recvfrom(1024)
+        print(f"Response from {host_from}: {data.decode()}")
     except:
         pass
 
@@ -64,39 +57,46 @@ if __name__ == "__main__":
     if len(sys.argv) != 3:
         show_usage()
 
-    # t = threading.Thread(target=receive)
-    # t.start()
+
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as client_sock:
+        # client also need to be bound to an ip and port
+        client_sock.bind(("127.0.0.1", CLIENT_PORT))
 
 
-    daemon_ip_request = sys.argv[1]
-    daemon_ip = "" + daemon_ip_request
-    print(f"daemon_ip_request {daemon_ip_request}")
+        daemon_ip_request = sys.argv[1]
+        daemon_ip = "" + daemon_ip_request
+        print(f"daemon_ip_request {daemon_ip_request}")
 
-    if connect(daemon_ip_request):
-        print(f"Successfully connected to daemon with ip {daemon_ip_request}")
+        if connect(daemon_ip_request, client_sock):
+            print(f"Successfully connected to daemon with ip {daemon_ip_request}")
 
-
-        while True:
-            receive()
-            message = input("Enter your message")
+            while True:
 
 
-            if message == "!q":
-                sys.exit()
+                message = input("Enter your message")
 
-            else:
-                send(daemon_ip, message.encode())
+                if message == "!q":
+                    send(daemon_ip, message.encode(), client_sock)
+                    sys.exit()
 
-                # socket error here for simp_daemon
-
-                pass
-
-
+                else:
+                    send(daemon_ip, message.encode(), client_sock)
+                    receive(client_sock)
 
 
-    else:
-        print(f"failed to connect to {daemon_ip}")
-        sys.exit()
+        else:
+            print(f"failed to connect to {daemon_ip}")
+            sys.exit()
+
+
+
+
+
+
+
+
+
+
 
 
 
