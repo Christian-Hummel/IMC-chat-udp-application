@@ -21,10 +21,12 @@ class ExampleDaemon:
         self.CLIENT_PORT = 7778
         self.daemon_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.client_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.host_address = ""
         self.daemon_sock.bind((self.ip_address,self.DAEMON_PORT))
         self.client_sock.bind((self.ip_address,self.CLIENT_PORT))
         self.daemon_connection = False
         self.client_connection = False
+        self.shutdown = False
 
     def start(self):
         print(f"Daemon running at {self.ip_address}")
@@ -41,79 +43,23 @@ class ExampleDaemon:
 
     def connection_request(self, msg, ip_address):
 
-        if msg.decode() == "connectionrequest":
+        if msg.decode() == "connectionrequest" and not self.client_connection:
             message = b'connected'
+            self.host_address = ip_address
             self.client_sock.sendto(message, (ip_address, CLIENT_PORT))
             self.client_connection = True
             return True
 
-        else:
-            error = b'Connection refused'
+        elif msg.decode() == "connectionrequest" and self.client_connection:
+            error = b'This daemon is already connected to a client'
             self.client_sock.sendto(error, (ip_address, CLIENT_PORT))
             return False
 
+        else:
+            error = b'Connection request failed'
+            self.client_sock.sendto(error, (ip_address, CLIENT_PORT))
+            return False
 
-
-
-    def daemon_listen(self):
-        print(f"Listening for messages from daemons on port 7777 ")
-
-        while True:
-
-            data , host_from = self.daemon_sock.recvfrom(1024)
-            address, _ = host_from
-            print('Connected by', host_from)
-            print(address)
-            if not data:
-                break
-            print('Sending back data: ', data)
-            self.handshake(data, address)
-            print(f"connection status {self.daemon_connection}")
-
-
-
-    def client_listen(self):
-
-        print("Listening for messages from clients on port 7778")
-        iteration = 0
-        client_sock = self.client_sock
-
-        while True:
-            print(f"iteration {iteration}")
-            iteration += 1
-            data, host_from = client_sock.recvfrom(1024)
-            host_address, _ = host_from
-
-            if not self.client_connection:
-                self.connection_request(data, host_address)
-
-            else:
-
-                if data == "connectionrequest":
-                    error = b'This daemon is already connected to a client'
-                    self.client_sock.sendto(error, (host_address, CLIENT_PORT))
-                    continue
-
-
-                reply = data
-
-                print(f"sending reply {reply}")
-                client_sock.sendto(reply, (host_address, CLIENT_PORT))
-
-            if not data:
-                self.client_connection = False
-                break
-                # print('Sending back data: ', data)
-                # self.handshake(data, address)
-                # print(f"connection status {self.client_connection}")
-
-
-
-    def client_message(self):
-        pass
-
-    def daemon_message(self):
-        pass
 
     def handshake(self, message, address):
 
@@ -152,6 +98,71 @@ class ExampleDaemon:
             # timeout
             # self.connection = False
             pass
+
+
+    def client_message(self):
+        pass
+
+    def daemon_message(self):
+        pass
+
+
+
+
+    def daemon_listen(self):
+        print(f"Listening for messages from daemons on port 7777 ")
+
+
+        if self.client_connection:
+
+            while True:
+
+                data , host_from = self.daemon_sock.recvfrom(1024)
+                address, _ = host_from
+                print('Connected by', host_from)
+                print(address)
+                if not data:
+                    break
+                print('Sending back data: ', data)
+                self.handshake(data, address)
+                print(f"connection status {self.daemon_connection}")
+
+        elif self.shutdown:
+            sys.exit()
+
+
+
+    def client_listen(self):
+
+        print("Listening for messages from clients on port 7778")
+
+        client_sock = self.client_sock
+        daemon_sock = self.daemon_sock
+
+        data, host_from = client_sock.recvfrom(1024)
+        address, _ = host_from
+
+        if self.connection_request(data, address):
+
+            while True:
+
+                data, host_from = client_sock.recvfrom(1024)
+
+                if data.decode() == "!q":
+                    self.shutdown = True
+                    break
+
+                reply = data
+
+                print(f"sending reply {reply}")
+                client_sock.sendto(reply, (self.host_address, CLIENT_PORT))
+
+                if not data:
+                    self.client_connection = False
+                    break
+
+
+
 
 
 
