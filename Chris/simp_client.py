@@ -4,7 +4,7 @@ import socket
 import threading
 import sys
 import time
-
+import keyboard
 
 
 CLIENT_PORT = 7778
@@ -42,7 +42,7 @@ def send(host, message: bytes, client_sock):
 def receive(client_sock):
     try:
         data, host_from = client_sock.recvfrom(1024)
-        print(f"Response from {host_from}: {data.decode()}")
+        print(data.decode())
     except:
         pass
 
@@ -63,6 +63,7 @@ if __name__ == "__main__":
         show_usage()
 
 
+
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as client_sock:
         # client also need to be bound to an ip and port
         client_sock.bind(("127.0.0.1", CLIENT_PORT))
@@ -75,18 +76,56 @@ if __name__ == "__main__":
         if connect(daemon_ip_request, client_sock):
             print(f"Successfully connected to daemon with ip {daemon_ip_request}")
 
+            username = input("Please enter your username: ")
+            send(daemon_ip, username.encode(), client_sock)
+
+            options = receive(client_sock)
+
+            response = int(input())
+            send(daemon_ip, str(response).encode(), client_sock)
+
             while True:
 
+                data, _ = client_sock.recvfrom(1024)
 
-                message = input("Enter your message")
+                if data.decode() == "1":
+                    chat_request = input("Please enter the IP address of the user you want to chat with")
+                    send(daemon_ip, chat_request.encode(), client_sock)
+                    sys.exit()
 
-                # shut down client - daemon connection
-                if message == "!q":
-                    quit(daemon_ip ,message.encode(), client_sock)
+                elif data.decode() == "2":
+                    print("Waiting for incoming chat requests, press q disconnect")
+                    while True:
+                        receive(client_sock)
 
-                else:
-                    send(daemon_ip, message.encode(), client_sock)
-                    receive(client_sock)
+
+
+
+
+
+
+
+
+
+                print(data)
+                msg = input()
+                send(daemon_ip, msg.encode(), client_sock)
+
+
+
+                # chat functionality
+                # while True:
+                #
+                #
+                #     message = input("Enter your message")
+                #
+                #     # shut down client - daemon connection
+                #     if message == "!q":
+                #         quit(daemon_ip ,message.encode(), client_sock)
+                #
+                #     else:
+                #         send(daemon_ip, message.encode(), client_sock)
+                #         receive(client_sock)
 
 
 
