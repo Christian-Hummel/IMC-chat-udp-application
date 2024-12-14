@@ -22,10 +22,12 @@ class ExampleDaemon:
         self.daemon_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.client_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.host_address = ""
+        self.receiver_address = ""
         self.daemon_sock.bind((self.ip_address,self.DAEMON_PORT))
         self.client_sock.bind((self.ip_address,self.CLIENT_PORT))
         self.daemon_connection = False
         self.client_connection = False
+        self.client_username = ""
         self.shutdown = False
 
     def start(self):
@@ -99,9 +101,19 @@ class ExampleDaemon:
             # self.connection = False
             pass
 
+    def client_receive(self):
+
+        message, _ = self.client_sock.recvfrom(1024)
+        return message.decode()
+
 
     def client_message(self):
         pass
+
+    def daemon_receive(self):
+
+        message, _ = self.daemon_sock.recvfrom(1024)
+        return message
 
     def daemon_message(self):
         pass
@@ -136,30 +148,60 @@ class ExampleDaemon:
 
         print("Listening for messages from clients on port 7778")
 
-        client_sock = self.client_sock
-        daemon_sock = self.daemon_sock
 
-        data, host_from = client_sock.recvfrom(1024)
+
+        data, host_from = self.client_sock.recvfrom(1024)
         address, _ = host_from
 
         if self.connection_request(data, address):
 
-            while True:
+            self.client_username = self.client_receive()
+            print(f"Username {self.client_username}")
+            intro = b'Press 1 to start a new chat or 2 to wait for incoming chat requests'
+            self.client_sock.sendto(intro, (self.host_address, CLIENT_PORT))
 
-                data, host_from = client_sock.recvfrom(1024)
+            user_choice = self.client_receive()
+            if user_choice == "1":
 
-                if data.decode() == "!q":
-                    self.shutdown = True
-                    break
+                self.client_sock.sendto(user_choice.encode(), (self.host_address, CLIENT_PORT))
+                ip_address = self.client_receive()
+                print(f"User entered ip address: {ip_address}")
+                sys.exit()
 
-                reply = data
+            elif user_choice == "2":
 
-                print(f"sending reply {reply}")
-                client_sock.sendto(reply, (self.host_address, CLIENT_PORT))
+                self.client_sock.sendto(user_choice.encode(), (self.host_address, CLIENT_PORT))
 
-                if not data:
-                    self.client_connection = False
-                    break
+                while True:
+                    print("Waiting for now")
+                    self.client_receive()
+
+            else:
+
+                error = b'Wrong input, please enter 1 to start a new chat or 2 to wait for incoming chat requests'
+                self.client_sock.sendto(error, (self.host_address, CLIENT_PORT))
+
+
+
+
+
+            # chat functionality
+            # while True:
+            #
+            #     data, host_from = self.client_sock.recvfrom(1024)
+            #
+            #     if data.decode() == "!q":
+            #         self.shutdown = True
+            #         break
+            #
+            #     reply = data
+            #
+            #     print(f"sending reply {reply}")
+            #     self.client_sock.sendto(reply, (self.host_address, CLIENT_PORT))
+            #
+            #     if not data:
+            #         self.client_connection = False
+            #         break
 
 
 
