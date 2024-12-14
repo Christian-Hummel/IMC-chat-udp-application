@@ -41,14 +41,15 @@ class ExampleDaemon:
 
     def connection_request(self, msg, ip_address):
 
-
-        if not self.client_connection and msg.decode() == "connectionrequest":
+        if msg.decode() == "connectionrequest":
             message = b'connected'
             self.client_sock.sendto(message, (ip_address, CLIENT_PORT))
             self.client_connection = True
             return True
 
         else:
+            error = b'Connection refused'
+            self.client_sock.sendto(error, (ip_address, CLIENT_PORT))
             return False
 
 
@@ -75,36 +76,29 @@ class ExampleDaemon:
 
         print("Listening for messages from clients on port 7778")
         iteration = 0
+        client_sock = self.client_sock
+
         while True:
-            iteration += 1
             print(f"iteration {iteration}")
-            data, host_from = self.client_sock.recvfrom(1024)
-            print(f"data {data}")
-            address, _ = host_from
+            iteration += 1
+            data, host_from = client_sock.recvfrom(1024)
+            host_address, _ = host_from
 
-            if data.decode() == "connectionrequest":
-                if not self.client_connection:
+            if not self.client_connection:
+                self.connection_request(data, host_address)
 
-                    self.connection_request(data, address)
-                    print(f"connection {self.client_connection}")
-                    continue
+            else:
 
-
-                else:
+                if data == "connectionrequest":
                     error = b'This daemon is already connected to a client'
-
-                    self.client_sock.sendto(error, (address, CLIENT_PORT))
+                    self.client_sock.sendto(error, (host_address, CLIENT_PORT))
                     continue
 
 
-            elif data.decode() != "connectionrequest":
+                reply = data
 
-                print(f"sending back data {data}")
-
-                self.client_sock.sendto(data, (address, CLIENT_PORT))
-                continue
-
-
+                print(f"sending reply {reply}")
+                client_sock.sendto(reply, (host_address, CLIENT_PORT))
 
             if not data:
                 self.client_connection = False
@@ -112,13 +106,6 @@ class ExampleDaemon:
                 # print('Sending back data: ', data)
                 # self.handshake(data, address)
                 # print(f"connection status {self.client_connection}")
-
-
-
-
-
-
-
 
 
 
@@ -172,7 +159,9 @@ class ExampleDaemon:
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         exit(1)
+
     daemon = ExampleDaemon(sys.argv[1])
     daemon.start()
+
 
 
