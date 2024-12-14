@@ -46,6 +46,11 @@ def receive(client_sock):
     except:
         pass
 
+def quit(host, message, client_sock):
+
+    client_sock.sendto(message, (host, CLIENT_PORT))
+    sys.exit()
+
 
 
 
@@ -75,18 +80,17 @@ if __name__ == "__main__":
 
                 message = input("Enter your message")
 
+                # shut down client - daemon connection
                 if message == "!q":
-                    send(daemon_ip, message.encode(), client_sock)
-                    sys.exit()
+                    quit(daemon_ip ,message.encode(), client_sock)
 
                 else:
                     send(daemon_ip, message.encode(), client_sock)
                     receive(client_sock)
 
 
-        else:
-            print(f"failed to connect to {daemon_ip}")
-            sys.exit()
+
+
 
 
 
