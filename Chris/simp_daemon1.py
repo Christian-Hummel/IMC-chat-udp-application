@@ -123,18 +123,17 @@ class ExampleDaemon:
     def daemon_listen(self):
         print(f"Listening for messages from daemons on port 7777 ")
 
-        while not self.shutdown:
 
-            while True:
+        while True:
 
-                data, host_from = self.daemon_sock.recvfrom(1024)
-                address, _ = host_from
-                print(f'Message from {address}: {data}')
-                self.daemon_receive(data, address)
+            data, host_from = self.daemon_sock.recvfrom(1024)
+            address, _ = host_from
+            print(f'Message from {address}: {data}')
+            self.daemon_receive(data, address)
 
-                if self.daemon_connection:
-                    print("Exiting loop")
-                    break
+            if self.daemon_connection:
+                print("Exiting loop")
+                break
 
 
         print(f"Closing")
