@@ -89,7 +89,7 @@ if __name__ == "__main__":
                 data, _ = client_sock.recvfrom(1024)
 
                 if data.decode() == "1":
-                    chat_request = input("Please enter the IP address of the user you want to chat with")
+                    chat_request = input("Please enter the IP address of the user you want to chat with: ")
                     send(daemon_ip, chat_request.encode(), client_sock)
                     sys.exit()
 
