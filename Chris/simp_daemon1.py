@@ -81,9 +81,9 @@ class ExampleDaemon:
 
     def handshake(self, message, address):
 
-        self.receiver_address = address
-
         if not self.daemon_connection:
+
+            self.receiver_address = address
 
             if message == b'0x02':
                 self.daemon_sock.sendto(b'0x06', (self.receiver_address, DAEMON_PORT))
@@ -135,6 +135,7 @@ class ExampleDaemon:
                 if self.daemon_connection:
                     print("Exiting loop")
                     break
+
 
         print(f"Closing")
         self.shutdown = True
