@@ -6,23 +6,15 @@ import sys
 import time
 import keyboard
 
-
 CLIENT_PORT = 7778
 
 
-
-
-
-
-
 def connect(ip_address, client_sock):
-
-
     conn_test = b'connectionrequest'
 
     try:
 
-        client_sock.sendto(conn_test, (ip_address,CLIENT_PORT))
+        client_sock.sendto(conn_test, (ip_address, CLIENT_PORT))
         data, _ = client_sock.recvfrom(1024)
         if data.decode() == "connected":
             return True
@@ -31,27 +23,22 @@ def connect(ip_address, client_sock):
         return False
 
 
-
-
-def send(host, message: bytes, client_sock):
-
-    client_sock.sendto(message, (host,CLIENT_PORT))
-
+def send(message: bytes, host, client_sock):
+    client_sock.sendto(message, (host, CLIENT_PORT))
 
 
 def receive(client_sock):
     try:
         data, host_from = client_sock.recvfrom(1024)
-        print(data.decode())
+        return data.decode()
+
     except:
         pass
 
-def quit(host, message, client_sock):
 
+def quit(host, message, client_sock):
     client_sock.sendto(message, (host, CLIENT_PORT))
     sys.exit()
-
-
 
 
 def show_usage():
@@ -62,12 +49,9 @@ if __name__ == "__main__":
     if len(sys.argv) != 3:
         show_usage()
 
-
-
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as client_sock:
         # client also need to be bound to an ip and port
         client_sock.bind(("127.0.0.1", CLIENT_PORT))
-
 
         daemon_ip_request = sys.argv[1]
         daemon_ip = "" + daemon_ip_request
@@ -77,41 +61,43 @@ if __name__ == "__main__":
             print(f"Successfully connected to daemon with ip {daemon_ip_request}")
 
             username = input("Please enter your username: ")
-            send(daemon_ip, username.encode(), client_sock)
+            send(username.encode(), daemon_ip, client_sock)
 
             options = receive(client_sock)
+            print(options)
 
-            response = int(input())
-            send(daemon_ip, str(response).encode(), client_sock)
+            response = input()
+            send(response.encode(), daemon_ip, client_sock)
 
             while True:
 
-                data, _ = client_sock.recvfrom(1024)
+                data = receive(client_sock)
 
-                if data.decode() == "1":
+                if data == "1":
                     chat_request = input("Please enter the IP address of the user you want to chat with: ")
-                    send(daemon_ip, chat_request.encode(), client_sock)
-                    sys.exit()
+                    send(chat_request.encode(), daemon_ip, client_sock)
+                    continue
 
-                elif data.decode() == "2":
+                elif data == "2":
                     print("Waiting for incoming chat requests, press q disconnect")
                     while True:
-                        receive(client_sock)
+                        data = receive(client_sock)
 
+                        if data == "quit":
+                            print("Exiting conversation")
+                            client_sock.close()
 
+                        print(data)
+                        response = input("Enter your message: ")
+                        send(response.encode(), daemon_ip, client_sock)
 
-
-
-
-
-
-
+                if data == "quit":
+                    print("Exiting conversation")
+                    client_sock.close()
 
                 print(data)
-                msg = input()
-                send(daemon_ip, msg.encode(), client_sock)
-
-
+                msg = input("Enter your message: ")
+                send(msg.encode(), daemon_ip, client_sock)
 
                 # chat functionality
                 # while True:
@@ -126,30 +112,6 @@ if __name__ == "__main__":
                 #     else:
                 #         send(daemon_ip, message.encode(), client_sock)
                 #         receive(client_sock)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     # while True:
     #     client_input = input("1 for start conversation and 0 for wait")
