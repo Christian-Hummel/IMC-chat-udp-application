@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import socket
 import sys
 import threading
@@ -171,76 +169,79 @@ class ExampleDaemon:
 
         if self.connection_request(data, address):
 
-            self.client_username = self.client_receive()
-            print(f"Username {self.client_username}")
-            intro = b'Press 1 to start a new chat or 2 to wait for incoming chat requests'
-            self.client_sock.sendto(intro, (self.host_address, self.CLIENT_PORT))
-
-            user_choice = self.client_receive()
-            if user_choice == "1":
-
-                self.client_sock.sendto(user_choice.encode(), (self.host_address, self.CLIENT_PORT))
-                daemon_address = self.client_receive()
-                print(f"User entered ip address: {daemon_address}")
-
-                msg = b'0x02'
-                self.daemon_sock.sendto(msg, (daemon_address, self.DAEMON_PORT))
-                while True:
-                    message = self.client_receive()
-
-                    if self.daemon_connection:
-
-                        self.client_sock.sendto(message.encode(), (self.ip_address, self.DAEMON_PORT))
-                        print(self.client_receive())
-
-                    elif not self.daemon_connection:
-                        break
+            user_request = b'Please enter your username'
+            self.client_sock.sendto(user_request, (self.host_address, self.CLIENT_PORT))
+            username = self.client_receive()
+            print(username)
+            self.client_username = username
+            options = b'Press 1 to start a new chat or 2 to wait for incoming chat requests'
+            self.client_sock.sendto(options, (self.host_address, self.CLIENT_PORT))
 
 
+            while True:
 
-            elif user_choice == "2":
+                # capture user input
+                user_choice = self.client_receive()
 
-                self.client_sock.sendto(user_choice.encode(), (self.host_address, self.CLIENT_PORT))
+                if user_choice == "1":
 
-                while True:
+                    ip_request = b'Please enter IP address to connect to'
 
-                    if self.daemon_connection:
-                        print(f"Connected to {self.receiver_address}")
+                    self.client_sock.sendto(ip_request, (self.host_address, self.CLIENT_PORT))
 
-                    elif not self.daemon_connection:
-                        break
+                    daemon_address = self.client_receive()
 
-                    print(self.client_receive())
-                    response = input("Enter your message: ")
-                    self.client_sock.sendto(response.encode(), (self.ip_address, self.DAEMON_PORT))
+                    print(f"User entered ip address: {daemon_address}")
+
+                    msg = b'0x02'
+                    self.daemon_sock.sendto(msg, (daemon_address, self.DAEMON_PORT))
+                    while True:
+
+                        message = self.client_receive()
+
+                        if self.daemon_connection:
+
+                            self.client_sock.sendto(message.encode(), (self.ip_address, self.DAEMON_PORT))
+                            print(self.client_receive())
+
+                        elif not self.daemon_connection:
+                            break
+
+
+                elif user_choice == "2":
+
+                    client_information = b'Waiting for incoming chat requests, please wait or press q to exit'
+
+                    self.client_sock.sendto(client_information, (self.host_address, self.CLIENT_PORT))
+
+                    while True:
+
+                        if self.daemon_connection:
+                            print(f"Connected to {self.receiver_address}")
+                            print(self.client_receive())
+                            response = input("Enter your message: ")
+                            self.client_sock.sendto(response.encode(), (self.ip_address, self.DAEMON_PORT))
+
+                        elif self.client_receive() == "Exit":
+                            self.shutdown = True
+                            break
+
+                    print("outside loop")
+                    break
+
+
+                else:
+
+                    error = b'Wrong input, please enter 1 to start a new chat or 2 to wait for incoming chat requests'
+                    self.client_sock.sendto(error, (self.host_address, self.CLIENT_PORT))
 
 
 
-                print(f"established connection, now closing")
+
                 self.shutdown = True
 
-            else:
+                print("outside all loops")
 
-                error = b'Wrong input, please enter 1 to start a new chat or 2 to wait for incoming chat requests'
-                self.client_sock.sendto(error, (self.host_address, self.CLIENT_PORT))
-
-            # chat functionality
-            # while True:
-            #
-            #     data, host_from = self.client_sock.recvfrom(1024)
-            #
-            #     if data.decode() == "!q":
-            #         self.shutdown = True
-            #         break
-            #
-            #     reply = data
-            #
-            #     print(f"sending reply {reply}")
-            #     self.client_sock.sendto(reply, (self.host_address, CLIENT_PORT))
-            #
-            #     if not data:
-            #         self.client_connection = False
-            #         break
 
 
 if __name__ == "__main__":
