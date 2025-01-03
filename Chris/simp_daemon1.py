@@ -65,9 +65,9 @@ class ExampleDaemon:
 
 
         # check if message is coming from client or daemon and forward it
-        elif self.daemon_connection:
+        if self.daemon_connection:
             print(f"chat connection with {self.receiver_address}, address: {address}")
-            if address == self.host_address:
+            if address == self.ip_address:
                 self.daemon_sock.sendto(message, (self.receiver_address, self.DAEMON_PORT))
 
             elif address == self.receiver_address:
@@ -95,10 +95,16 @@ class ExampleDaemon:
             return False
 
     def handshake(self, message, address):
+        print(message)
+        print(message == b'0x02')
 
         if not self.daemon_connection:
 
-            if message == b'0x02':
+            if message.startswith(b'request_connection'):
+                daemon_address = message.decode("ascii").split(" ")[1]
+                self.daemon_sock.sendto(b'0x02', (daemon_address, self.DAEMON_PORT))
+
+            elif message == b'0x02':
                 self.daemon_sock.sendto(b'0x06', (address, self.DAEMON_PORT))
                 print(f"Sending back ACK + SYN")
 
@@ -117,6 +123,9 @@ class ExampleDaemon:
                 self.daemon_connection = True
                 self.receiver_address = address
                 print(f"connection established as a receiver with {address}")
+
+            elif message == b'wait':
+                return
 
 
         elif self.daemon_connection:
@@ -193,8 +202,12 @@ class ExampleDaemon:
 
                     print(f"User entered ip address: {daemon_address}")
 
-                    msg = b'0x02'
-                    self.daemon_sock.sendto(msg, (daemon_address, self.DAEMON_PORT))
+                    request = f"request_connection {daemon_address}"
+
+
+                    self.client_sock.sendto(request.encode("ascii"), (self.ip_address, self.DAEMON_PORT))
+
+
                     while True:
 
                         message = self.client_receive()
@@ -213,6 +226,8 @@ class ExampleDaemon:
                     client_information = b'Waiting for incoming chat requests, please wait or press q to exit'
 
                     self.client_sock.sendto(client_information, (self.host_address, self.CLIENT_PORT))
+
+                    self.client_sock.sendto(b'Wait', (self.ip_address, self.DAEMON_PORT))
 
                     while True:
 
