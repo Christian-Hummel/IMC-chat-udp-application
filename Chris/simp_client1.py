@@ -58,33 +58,37 @@ if __name__ == "__main__":
         daemon_ip = "" + daemon_ip_request
         print(f"daemon_ip_request {daemon_ip_request}")
 
+        # Connect client with daemon
         if connect(daemon_ip_request, client_sock):
             print(f"Successfully connected to daemon with ip {daemon_ip_request}")
 
+            # General wait for messages
             while True:
 
                 data = receive(client_sock)
 
+                # second possibility - User chose to stay idle
                 if data == "Waiting for incoming chat requests, please wait or press q to exit":
                     print(data)
 
 
-
                     while True:
+
+                        data = receive(client_sock)
+                        print(data)
+                        print("waiting 1")
+
+                        if data.startswith("Connected with"):
+                            message = receive(client_sock)
+                            print(message)
+
+
+                        response = input()
+                        send(response.encode("ascii"), daemon_ip, client_sock)
 
                         if keyboard.is_pressed("q"):
                             break
 
-                        # This section is blocking if uncommented - keyboard input will not be
-                        # recognized
-                        #
-                        # data = receive(client_sock)
-                        #
-                        # print(data)
-                        #
-                        # response = input()
-                        #
-                        # send(response.encode("ascii"), daemon_ip, client_sock)
 
                     quit(daemon_ip, client_sock)
                     break
@@ -95,7 +99,7 @@ if __name__ == "__main__":
 
                 response = input()
 
-                send(response.encode(), daemon_ip, client_sock)
+                send(response.encode("ascii"), daemon_ip, client_sock)
 
 
 
