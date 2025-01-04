@@ -65,13 +65,16 @@ class ExampleDaemon:
 
 
         # check if message is coming from client or daemon and forward it
-        if self.daemon_connection:
+        elif self.daemon_connection:
             print(f"chat connection with {self.receiver_address}, address: {address}")
+
+            # message coming from connected client - send to receiver
             if address == self.ip_address:
                 self.daemon_sock.sendto(message, (self.receiver_address, self.DAEMON_PORT))
 
-            # elif address == self.receiver_address:
-            #     self.daemon_sock.sendto(message, (self.host_address, self.CLIENT_PORT))
+            # message coming from connected daemon - send to client
+            elif address == self.receiver_address:
+                self.daemon_sock.sendto(message, (self.host_address, self.CLIENT_PORT))
 
 
 
@@ -115,13 +118,15 @@ class ExampleDaemon:
                 print(f"Sending back {reply}")
                 self.daemon_connection = True
                 self.receiver_address = address
-                print(f"connection established as a sender with {address}")
+                confirmation = f"Connected with {address}, please enter your message"
+                self.daemon_sock.sendto(confirmation.encode("ascii"), (self.host_address, self.CLIENT_PORT))
 
 
             elif message == b'0x04':
                 self.daemon_connection = True
                 self.receiver_address = address
-                print(f"connection established as a receiver with {address}")
+                confirmation = f"Connected with {address}"
+                self.daemon_sock.sendto(confirmation.encode("ascii"), (self.host_address, self.CLIENT_PORT))
 
 
         elif self.daemon_connection:
@@ -206,15 +211,11 @@ class ExampleDaemon:
 
                     while True:
 
-                        message = self.client_receive()
-
                         if self.daemon_connection:
 
-                            self.client_sock.sendto(message.encode(), (self.ip_address, self.DAEMON_PORT))
-                            print(self.client_receive())
+                            message = self.client_receive()
+                            self.client_sock.sendto(message.encode("ascii"), (self.ip_address, self.DAEMON_PORT))
 
-                        elif not self.daemon_connection:
-                            break
 
 
                 elif user_choice == "2":
@@ -228,14 +229,17 @@ class ExampleDaemon:
                     while True:
 
                         if self.daemon_connection:
-                            print(f"Connected to {self.receiver_address}")
-                            print(self.client_receive())
-                            response = input("Enter your message: ")
-                            self.client_sock.sendto(response.encode(), (self.ip_address, self.DAEMON_PORT))
 
-                        elif self.client_receive() == "Exit":
-                            self.shutdown = True
-                            break
+                            data = self.client_receive()
+                            print(data)
+
+                            if data == "exit":
+                                self.shutdown = True
+                                break
+
+                            self.client_sock.sendto(data.encode("ascii"), (self.ip_address, self.DAEMON_PORT))
+
+
 
                     print("outside loop")
                     break
