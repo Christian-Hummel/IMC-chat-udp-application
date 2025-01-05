@@ -4,6 +4,8 @@ import threading
 import time
 from enum import Enum
 
+
+
 MAX_HEADER_SIZE = 35 # constant size (in bytes) of header
 MESSAGE_TYPE_SIZE = 1
 MESSAGE_OPERATION_SIZE = 1
@@ -17,33 +19,37 @@ MESSAGE_USER_SIZE = 32
 # ljust(32, b'0x00') - function to pad username field with zero bytes until 32 is reached
 class Datagram:
     def __init__(self, type, sequence, username, payload=None, operation=None):
+        # type conditions
         if type== 1:
             self.type = int.to_bytes(1, 1, byteorder="big")
         elif type == 2:
             self.type = int.to_bytes(2, 1, byteorder="big")
+        # sequence conditions
         if sequence == 0:
             self.sequence = int.to_bytes(0, 1, byteorder='big')
         elif sequence == 1:
             self.sequence = int.to_bytes(1, 1, byteorder='big')
-
-        self.length = int(0).to_bytes(1, byteorder='big')
+        # operation conditions
+        if operation != None:
+            self.operation = operation.to_bytes(1, byteorder='big')
+        else:
+            self.operation = int(1).to_bytes(1, byteorder='big')
+        # username format
         self.username = username.encode("ascii").ljust(32, int(0).to_bytes(1, byteorder='big'))
+        # payload conditions
         if payload != None:
             self.payload = payload.encode("ascii")
             self.length = int.to_bytes(len(payload), 4, byteorder='big')
         else:
             self.payload = b""
-
-        if operation != None:
-            self.operation = operation.to_bytes(1, byteorder='big')
-        else:
-            self.operation = int(1).to_bytes(1, byteorder='big')
-
+        # calculate length of payload
+        self.length = len(self.payload).to_bytes(1, byteorder='big')
 
     def __repr__(self):
         return "".join([str(self.type), str(self.operation), str(self.sequence), str(self.username), str(self.payload)])
 
-
+    def bytearray(self):
+        return b''.join([self.type, self.operation, self.sequence, self.username, self.length, self.payload])
 
 
 class HeaderType(Enum):
@@ -167,42 +173,27 @@ def build_response(header_info: HeaderInfo, datagram) -> Datagram:
         if len(operation) > 1:
             print(operation)
 
-            return [Datagram(), Datagram()]
-
-
-    return Datagram()
-
-# -- Sender
-# receive syn
-# send err
-# send FIN
-
-
-# -- Receiver
-# 1 - send chat request
-# send syn
-# receive err
-    # if operation == ERR
-    # recvfrom()
-    # FIN
-    # reset chat request
-
-
-    response = build_response()
 
 
 
 
 
 
-data1 = Datagram(type=1, operation=2, sequence=0, username="Chris")
+
+data1 = Datagram(type=1, operation=2, sequence=1, username="Chris", payload="Hello")
 
 
-print(data1)
-#print(get_message_type(data1.type))
-header_info = check_header(data1)
 
-print(build_response(header_info, data1))
+data_byte = data1.bytearray()
+
+print(data_byte)
+
+
+
+
+
+
+
 
 
 
