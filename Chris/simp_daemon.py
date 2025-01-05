@@ -1,31 +1,45 @@
 import socket
 import sys
 import threading
-import time
 
 
+
+# ljust(32, b'0x00') - function to pad username field with zero bytes until 32 is reached
 class Datagram:
-    def __init__(self, type, operation, sequence, payload):
+    def __init__(self, type, sequence, username, payload=None, operation=None):
+        # type conditions
         if type== 1:
             self.type = int.to_bytes(1, 1, byteorder="big")
-            self.operation = int.to_bytes(operation, 1, byteorder="big")
-        if type == 2:
+        elif type == 2:
             self.type = int.to_bytes(2, 1, byteorder="big")
-            self.operation = int.to_bytes(1, 1, byteorder="big")
+        # sequence conditions
         if sequence == 0:
             self.sequence = int.to_bytes(0, 1, byteorder='big')
         elif sequence == 1:
             self.sequence = int.to_bytes(1, 1, byteorder='big')
-        self.length = int.to_bytes(len(payload), 4, byteorder='big')
-        if type == 1 and operation == 1:
-            self.payload = payload.encode("ascii")
+        # operation conditions
+        if operation != None:
+            self.operation = operation.to_bytes(1, byteorder='big')
         else:
-            self.payload = payload
+            self.operation = int(1).to_bytes(1, byteorder='big')
+        # username format
+        self.username = username.encode("ascii").ljust(32, int(0).to_bytes(1, byteorder='big'))
+        # payload conditions
+        if payload != None:
+            self.payload = payload.encode("ascii")
+            self.length = int.to_bytes(len(payload), 4, byteorder='big')
+        else:
+            self.payload = b""
+        # calculate length of payload
+        self.length = len(self.payload).to_bytes(1, byteorder='big')
 
     def __repr__(self):
-        return b''.join([self.type, self.operation, self.sequence, self.length, self.payload])
+        return "".join([str(self.type), str(self.operation), str(self.sequence), str(self.username), str(self.payload)])
 
+    def bytearray(self):
+        return b''.join([self.type, self.operation, self.sequence, self.username, self.length, self.payload])
 
+datagram1 = Datagram(type=2, operation=1, sequence=0, username="Chris", payload="Test_message" )
 
 class ExampleDaemon:
     def __init__(self, ip_address):
@@ -53,6 +67,10 @@ class ExampleDaemon:
         daemon_thread.join()
         client_thread.join()
 
+    #convert bytes to datagram instance
+    def format_data(self, bytes) -> Datagram:
+        pass
+
     def client_receive(self):
         message, _ = self.client_sock.recvfrom(1024)
         return message.decode("ascii")
@@ -75,6 +93,8 @@ class ExampleDaemon:
             # message coming from connected daemon - send to client
             elif address == self.receiver_address:
                 self.daemon_sock.sendto(message, (self.host_address, self.CLIENT_PORT))
+
+
 
 
 
@@ -135,6 +155,7 @@ class ExampleDaemon:
                 error = b'User already in another chat'
                 fin = b'0x08'
                 self.daemon_sock.sendto(fin, (address, self.DAEMON_PORT))
+                self.daemon_sock.sendto(error, (address, self.DAEMON_PORT))
 
             elif message == b'0x04':
                 self.client_sock.settimeout(5.0)
@@ -214,7 +235,11 @@ class ExampleDaemon:
                         if self.daemon_connection:
 
                             message = self.client_receive()
-                            self.client_sock.sendto(message.encode("ascii"), (self.ip_address, self.DAEMON_PORT))
+                            #self.client_sock.sendto(message.encode("ascii"), (self.ip_address, self.DAEMON_PORT))
+
+                            # Send datagram class in form of bytes to other Daemon
+                            self.client_sock.sendto(datagram1.bytearray(), (self.ip_address, self.DAEMON_PORT))
+
 
 
 
