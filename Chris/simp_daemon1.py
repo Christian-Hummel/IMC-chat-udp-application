@@ -57,6 +57,7 @@ class ExampleDaemon:
         self.client_username = ""
         self.shutdown = False
 
+
     def start(self):
         print(f"Daemon running at {self.ip_address}")
         daemon_thread = threading.Thread(target=self.daemon_listen)
@@ -70,12 +71,20 @@ class ExampleDaemon:
 
     # convert bytes to datagram instance
     def format_data(self, bytes) -> Datagram:
-        pass
+        type = bytes[0]
+        operation = bytes[1]
+        sequence = bytes[2]
+        username = bytes[3:33].strip(b'\x00').decode('ascii')
+        payload = bytes[36:].decode('ascii')
+
+        return Datagram(type=type, operation=operation, sequence=sequence, username=username, payload=payload)
+
 
     def client_receive(self):
         message, _ = self.client_sock.recvfrom(1024)
         return message.decode("ascii")
 
+    # function to handle incoming datagrams on daemon port
     def daemon_receive(self, message, address):
 
         if not self.daemon_connection:
@@ -92,7 +101,14 @@ class ExampleDaemon:
 
             # message coming from connected daemon - send to client
             elif address == self.receiver_address:
-                self.daemon_sock.sendto(message, (self.host_address, self.CLIENT_PORT))
+                if len(message) < 40:
+                    self.daemon_sock.sendto(message, (self.host_address, self.CLIENT_PORT))
+                else:
+                    print("ok")
+                    datagram = self.format_data(message)
+                    print(datagram.operation)
+                    print(isinstance(datagram, Datagram))
+                    self.daemon_sock.sendto(message, (self.host_address, self.CLIENT_PORT))
 
     def connection_request(self, msg, ip_address):
 
@@ -221,9 +237,9 @@ class ExampleDaemon:
 
                         if self.daemon_connection:
                             message = self.client_receive()
-                            #self.client_sock.sendto(message.encode("ascii"), (self.ip_address, self.DAEMON_PORT))
+                            self.client_sock.sendto(message.encode("ascii"), (self.ip_address, self.DAEMON_PORT))
 
-                            # Send datagram class in form of bytes to other Daemon
+                            #Send datagram class in form of bytes to other Daemon
                             #self.client_sock.sendto(datagram1.bytearray(), (self.ip_address, self.DAEMON_PORT))
 
 
