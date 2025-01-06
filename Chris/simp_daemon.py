@@ -168,7 +168,9 @@ class ExampleDaemon:
                     self.receiver_address = ""
 
 
-
+                elif message == b'!shutdown':
+                    print("received shutdown in handshake")
+                    self.shutdown = True
 
 
             elif isinstance(message, Datagram):
@@ -227,7 +229,6 @@ class ExampleDaemon:
                     self.daemon_sock.sendto(error, (address, self.DAEMON_PORT))
 
                 elif message.operation == b'\x04':
-                    self.client_sock.settimeout(5.0)
                     self.daemon_connection = False
 
 
@@ -235,6 +236,8 @@ class ExampleDaemon:
                     print("received FIN")
                     ack = Datagram(type=1, operation=4, sequence=0, username=self.client_username).bytearray()
                     print("Sending back ACK")
+                    information = "User ended conversation, press enter to go to main menu or type !shutdown to exit program"
+                    self.daemon_sock.sendto(information.encode("ascii"), (self.host_address, self.CLIENT_PORT))
                     self.daemon_sock.sendto(ack, (address, self.DAEMON_PORT))
                     self.receiver_address = ""
                     self.daemon_connection = False
@@ -247,6 +250,7 @@ class ExampleDaemon:
             data, host_from = self.daemon_sock.recvfrom(1024)
             address, _ = host_from
             print(f'Message from {address}: {data}')
+
 
             self.daemon_receive(data, address)
 
@@ -350,11 +354,19 @@ class ExampleDaemon:
 
                             self.client_sock.sendto(data.encode("ascii"), (self.ip_address, self.DAEMON_PORT))
 
+                        elif not self.daemon_connection and not self.receiver_address:
+                            break
+
 
                         elif self.daemon_connection:
 
                             data = self.client_receive()
-                            print(f"received {data}")
+                            print(f"received as receiver {data}")
+
+                            if data == "!shutdown":
+                                self.client_sock.sendto(data.encode("ascii"), (self.host_address, self.CLIENT_PORT))
+                                self.shutdown = True
+
 
                             self.client_sock.sendto(data.encode("ascii"), (self.ip_address, self.DAEMON_PORT))
 
