@@ -76,11 +76,13 @@ if __name__ == "__main__":
 
                         data = receive(client_sock)
                         print(data)
-                        print("waiting 1")
 
                         if data.startswith("Connected with"):
                             message = receive(client_sock)
                             print(message)
+
+                        elif data == "!shutdown":
+                            sys.exit()
 
 
                         response = input()
@@ -89,13 +91,11 @@ if __name__ == "__main__":
                         if keyboard.is_pressed("q"):
                             break
 
-
-                    quit(daemon_ip, client_sock)
-                    break
-
-
+                if data == "!shutdown":
+                    sys.exit()
 
                 print(data)
+
 
                 response = input()
 
