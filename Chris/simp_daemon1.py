@@ -50,13 +50,14 @@ class ExampleDaemon:
         self.daemon_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.client_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.host_address = ""
+        self.receiver_address = ""
         self.daemon_sock.bind((self.ip_address, self.DAEMON_PORT))
         self.client_sock.bind((self.ip_address, self.CLIENT_PORT))
         self.daemon_connection = False
         self.client_connection = False
         self.client_username = ""
+        self.idle = False
         self.shutdown = False
-
 
     def start(self):
         print(f"Daemon running at {self.ip_address}")
@@ -79,7 +80,6 @@ class ExampleDaemon:
 
         return Datagram(type=type, operation=operation, sequence=sequence, username=username, payload=payload)
 
-
     def client_receive(self):
         message, _ = self.client_sock.recvfrom(1024)
         return message.decode("ascii")
@@ -88,7 +88,13 @@ class ExampleDaemon:
     def daemon_receive(self, message, address):
 
         if not self.daemon_connection:
-            self.handshake(message, address)
+            # message from Client
+            if address == self.ip_address:
+                self.handshake(message, address)
+            # message from other Daemon
+            else:
+                message = self.format_data(message)
+                self.handshake(message, address)
 
 
         # check if message is coming from client or daemon and forward it
@@ -97,18 +103,20 @@ class ExampleDaemon:
 
             # message coming from connected client - send to receiver
             if address == self.ip_address:
-                self.daemon_sock.sendto(message, (self.receiver_address, self.DAEMON_PORT))
+                if message == b'!exit':
+                    self.handshake(message, address)
+                else:
+                    self.daemon_sock.sendto(message, (self.receiver_address, self.DAEMON_PORT))
 
             # message coming from connected daemon - send to client
             elif address == self.receiver_address:
-                if len(message) < 40:
+
+                if len(message) < 22:
                     self.daemon_sock.sendto(message, (self.host_address, self.CLIENT_PORT))
-                else:
-                    print("ok")
-                    datagram = self.format_data(message)
-                    print(datagram.operation)
-                    print(isinstance(datagram, Datagram))
-                    self.daemon_sock.sendto(message, (self.host_address, self.CLIENT_PORT))
+
+                elif len(message) > 21:
+                    message = self.format_data(message)
+                    self.handshake(message, address)
 
     def connection_request(self, msg, ip_address):
 
@@ -133,68 +141,118 @@ class ExampleDaemon:
 
         if not self.daemon_connection:
 
-            if message.startswith(b'request_connection'):
-                daemon_address = message.decode("ascii").split(" ")[1]
-                self.daemon_sock.sendto(b'0x02', (daemon_address, self.DAEMON_PORT))
-
-            elif message == b'0x02':
-                self.daemon_sock.sendto(b'0x06', (address, self.DAEMON_PORT))
-                print(f"Sending back ACK + SYN")
-
-
-            elif message == b'0x06':
-                print(f" message {message} address {address}")
-                reply = b'0x04'
-                self.daemon_sock.sendto(reply, (address, self.DAEMON_PORT))
-                print(f"Sending back {reply}")
-                self.daemon_connection = True
-                self.receiver_address = address
-                confirmation = f"Connected with {address}, please enter your message"
-                self.daemon_sock.sendto(confirmation.encode("ascii"), (self.host_address, self.CLIENT_PORT))
+            if not isinstance(message, Datagram):
+                if message.startswith(b'request_connection'):
+                    daemon_address = message.decode("ascii").split(" ")[1]
+                    if daemon_address != self.ip_address:
+                        print(f"receiver address {self.receiver_address}")
+                        syn = Datagram(type=1, operation=2, sequence=0, username=self.client_username).bytearray()
+                        self.daemon_sock.sendto(syn, (daemon_address, self.DAEMON_PORT))
+                    else:
+                        error = f"Already connected to daemon with address {self.ip_address}"
+                        self.daemon_sock.sendto(error.encode("ascii"), (self.host_address, self.CLIENT_PORT))
 
 
-            elif message == b'0x04':
-                self.daemon_connection = True
-                self.receiver_address = address
-                confirmation = f"Connected with {address}"
-                self.daemon_sock.sendto(confirmation.encode("ascii"), (self.host_address, self.CLIENT_PORT))
+                elif message == b'Wait':
+                    self.idle = True
+
+                elif message.upper() == b'Y':
+                    syn_ack = Datagram(type=1, operation=6, sequence=0, username=self.client_username).bytearray()
+                    self.daemon_sock.sendto(syn_ack, (self.receiver_address, self.DAEMON_PORT))
+                    print(f"Sending back ACK + SYN")
+
+                elif message.upper() == b'N':
+                    fin = Datagram(type=1, operation=8, sequence=0, username=self.client_username).bytearray()
+                    self.daemon_sock.sendto(fin, (self.receiver_address, self.DAEMON_PORT))
+                    print(f"Sending back FIN")
+                    self.receiver_address = ""
+
+
+
+
+
+            elif isinstance(message, Datagram):
+
+                if self.idle and message.operation == b'\x02':
+                    print("syn received")
+                    request = f"Connection Request from {address}, accept? [Y/N]"
+                    self.daemon_sock.sendto(request.encode("ascii"), (self.host_address, self.CLIENT_PORT))
+                    self.receiver_address = address
+
+                elif message.operation == b'\x06':
+                    print(f" message {message} address {address}")
+                    ack = Datagram(type=1, operation=4, sequence=0, username=self.client_username).bytearray()
+                    self.daemon_sock.sendto(ack, (address, self.DAEMON_PORT))
+                    print(f"Sending back {ack}")
+                    self.daemon_connection = True
+                    confirmation = f"Connected with {address}, please enter your message, type !exit to leave conversation"
+                    self.daemon_sock.sendto(confirmation.encode("ascii"), (self.host_address, self.CLIENT_PORT))
+
+                elif self.receiver_address and message.operation == b'\x04':
+                    self.daemon_connection = True
+                    self.receiver_address = address
+                    confirmation = f"Connected with {address}, type !exit to leave conversation"
+                    self.daemon_sock.sendto(confirmation.encode("ascii"), (self.host_address, self.CLIENT_PORT))
+
+                elif message.operation == b'\x08':
+                    error = f"User with {address}, declined your request"
+                    self.daemon_sock.sendto(error.encode("ascii"), (self.host_address, self.CLIENT_PORT))
+                    ack = Datagram(type=1, operation=4, sequence=0, username=self.client_username).bytearray()
+                    self.daemon_sock.sendto(ack, (address, self.DAEMON_PORT))
+                    self.receiver_address = ""
 
 
         elif self.daemon_connection:
 
-            if message == b'0x02':
-                error = b'User already in another chat'
-                fin = b'0x08'
-                self.daemon_sock.sendto(fin, (address, self.DAEMON_PORT))
-                self.daemon_sock.sendto(error, (address, self.DAEMON_PORT))
+            if not isinstance(message, Datagram):
 
-            elif message == b'0x04':
-                self.client_sock.settimeout(5.0)
-                self.daemon_connection = False
+                # receive exit command from active chat
+                if message == b'!exit':
+                    fin = Datagram(type=1, operation=8, sequence=0, username=self.client_username).bytearray()
+                    end = f"End conversation with {self.receiver_address}, press Enter to go to main menu or type !shutdown to exit program"
+                    self.daemon_sock.sendto(fin, (self.receiver_address, self.DAEMON_PORT))
+                    self.daemon_sock.sendto(end.encode("ascii"), (self.host_address, self.CLIENT_PORT))
+                    self.receiver_address = ""
+                    self.daemon_connection = False
+                    print(f"Sending FIN to end conversation")
 
 
-            elif message == b'0x08':
-                ack = b'0x04'
-                self.daemon_sock.sendto(ack, (address, self.DAEMON_PORT))
-                self.client_sock.settimeout(5.0)
-                self.daemon_connection = False
+
+            elif isinstance(message, Datagram):
+
+                if message.operation == b'\x02':
+                    error = Datagram(type=1, operation=1, sequence=0, username=self.client_username, payload="User already in another chat").bytearray()
+                    fin = Datagram(type=1, operation=8, sequence=0, username=self.client_username).bytearray()
+                    self.daemon_sock.sendto(fin, (address, self.DAEMON_PORT))
+                    self.daemon_sock.sendto(error, (address, self.DAEMON_PORT))
+
+                elif message.operation == b'\x04':
+                    self.client_sock.settimeout(5.0)
+                    self.daemon_connection = False
+
+
+                elif message.operation == b'\x08':
+                    print("received FIN")
+                    ack = Datagram(type=1, operation=4, sequence=0, username=self.client_username).bytearray()
+                    print("Sending back ACK")
+                    self.daemon_sock.sendto(ack, (address, self.DAEMON_PORT))
+                    self.receiver_address = ""
+                    self.daemon_connection = False
 
     def daemon_listen(self):
         print(f"Listening for messages from daemons on port 7777 ")
 
-        while True:
+        while not self.shutdown:
 
             data, host_from = self.daemon_sock.recvfrom(1024)
             address, _ = host_from
             print(f'Message from {address}: {data}')
 
-            if data == b'quit':
-                break
-
             self.daemon_receive(data, address)
 
-        print(f"Closing")
-        self.shutdown = True
+        # close socket if self.shutdown gets switched
+        self.daemon_sock.close()
+
 
     def client_listen(self):
 
@@ -209,12 +267,14 @@ class ExampleDaemon:
             user_request = b'Please enter your username'
             self.client_sock.sendto(user_request, (self.host_address, self.CLIENT_PORT))
             username = self.client_receive()
-            print(username)
+            print(f"username {username}")
             self.client_username = username
-            options = b'Press 1 to start a new chat or 2 to wait for incoming chat requests'
-            self.client_sock.sendto(options, (self.host_address, self.CLIENT_PORT))
 
-            while True:
+            while not self.shutdown:
+
+
+                options = b'Press 1 to start a new chat or 2 to wait for incoming chat requests'
+                self.client_sock.sendto(options, (self.host_address, self.CLIENT_PORT))
 
                 # capture user input
                 user_choice = self.client_receive()
@@ -226,6 +286,7 @@ class ExampleDaemon:
                     self.client_sock.sendto(ip_request, (self.host_address, self.CLIENT_PORT))
 
                     daemon_address = self.client_receive()
+                    self.receiver_address = daemon_address
 
                     print(f"User entered ip address: {daemon_address}")
 
@@ -235,15 +296,36 @@ class ExampleDaemon:
 
                     while True:
 
-                        if self.daemon_connection:
+                        if not self.daemon_connection and self.receiver_address:
+
                             message = self.client_receive()
+                            print(f"message received: {message}")
                             self.client_sock.sendto(message.encode("ascii"), (self.ip_address, self.DAEMON_PORT))
 
-                            #Send datagram class in form of bytes to other Daemon
-                            #self.client_sock.sendto(datagram1.bytearray(), (self.ip_address, self.DAEMON_PORT))
+                        elif not self.daemon_connection and not self.receiver_address:
+                            break
 
 
+                        elif self.daemon_connection:
 
+                            if self.receiver_address:
+
+                                message = self.client_receive()
+
+                                print(f"received as sender {message}")
+
+                                if message == "!shutdown":
+                                    self.client_sock.sendto(message.encode("ascii"),(self.host_address, self.CLIENT_PORT))
+                                    self.shutdown = True
+
+
+                                self.client_sock.sendto(message.encode("ascii"), (self.ip_address, self.DAEMON_PORT))
+
+                                # Send datagram class in form of bytes to other Daemon
+                                # self.client_sock.sendto(datagram1.bytearray(), (self.ip_address, self.DAEMON_PORT))
+
+                            elif not self.receiver_address:
+                                break
 
                 elif user_choice == "2":
 
@@ -255,29 +337,36 @@ class ExampleDaemon:
 
                     while True:
 
-                        if self.daemon_connection:
+                        if self.idle:
 
                             data = self.client_receive()
-                            print(data)
 
-                            if data == "exit":
-                                self.shutdown = True
+                            if data.upper() == "Y":
+                                self.idle = False
+
+                            if data.upper() == "N":
+                                self.client_sock.sendto(data.encode("ascii"), (self.ip_address, self.DAEMON_PORT))
                                 break
 
                             self.client_sock.sendto(data.encode("ascii"), (self.ip_address, self.DAEMON_PORT))
 
-                    print("outside loop")
-                    break
+
+                        elif self.daemon_connection:
+
+                            data = self.client_receive()
+                            print(f"received {data}")
+
+                            self.client_sock.sendto(data.encode("ascii"), (self.ip_address, self.DAEMON_PORT))
 
 
                 else:
 
-                    error = b'Wrong input, please enter 1 to start a new chat or 2 to wait for incoming chat requests'
+                    error = b'Wrong input'
                     self.client_sock.sendto(error, (self.host_address, self.CLIENT_PORT))
+                    continue
 
-                self.shutdown = True
-
-                print("outside all loops")
+        # close socket if self.shutdown gets switched
+        self.client_sock.close()
 
 
 if __name__ == "__main__":
