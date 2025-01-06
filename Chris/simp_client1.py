@@ -71,50 +71,36 @@ if __name__ == "__main__":
                 if data == "Waiting for incoming chat requests, please wait or press q to exit":
                     print(data)
 
-                    daemon_ip_request = sys.argv[1]
-                    daemon_ip = "" + daemon_ip_request
-                    print(f"daemon_ip_request {daemon_ip_request}")
 
-                    # Connect client with daemon
-                    if connect(daemon_ip_request, client_sock):
-                        print(f"Successfully connected to daemon with ip {daemon_ip_request}")
+                    while True:
 
-                        # General wait for messages
-                        while True:
+                        data = receive(client_sock)
 
-                            data = receive(client_sock)
+                        if data == "!shutdown":
+                            sys.exit()
 
-                            # second possibility - User chose to stay idle
-                            if data == "Waiting for incoming chat requests, please wait or press q to exit":
-                                print(data)
+                        print(data)
 
-                                while True:
+                        if data.startswith("Connected with"):
+                            message = receive(client_sock)
+                            print(message)
 
-                                    data = receive(client_sock)
-                                    print(data)
 
-                                    if data.startswith("Connected with"):
-                                        message = receive(client_sock)
-                                        print(message)
+                        response = input()
+                        send(response.encode("ascii"), daemon_ip, client_sock)
 
-                                    elif data == "!shutdown":
-                                        sys.exit()
+                        if keyboard.is_pressed("q"):
+                            break
 
-                                    response = input()
-                                    send(response.encode("ascii"), daemon_ip, client_sock)
+                if data == "!shutdown":
+                    sys.exit()
 
-                                    if keyboard.is_pressed("q"):
-                                        break
+                print(data)
 
-                            if data == "!shutdown":
-                                sys.exit()
 
-                            print(data)
+                response = input()
 
-                            response = input()
-
-                            send(response.encode("ascii"), daemon_ip, client_sock)
-
+                send(response.encode("ascii"), daemon_ip, client_sock)
 
 
 

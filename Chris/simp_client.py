@@ -75,14 +75,16 @@ if __name__ == "__main__":
                     while True:
 
                         data = receive(client_sock)
+
+                        if data == "!shutdown":
+                            sys.exit()
+
                         print(data)
 
                         if data.startswith("Connected with"):
                             message = receive(client_sock)
                             print(message)
 
-                        elif data == "!shutdown":
-                            sys.exit()
 
 
                         response = input()
