@@ -66,12 +66,14 @@ if __name__ == "__main__":
             while True:
 
                 data = receive(client_sock)
+                print("sender loop")
 
                 # second possibility - User chose to stay idle
                 if data == "Waiting for incoming chat requests, please wait or press q to exit":
                     print(data)
 
 
+                    # chat sector - receiver side
                     while True:
 
                         data = receive(client_sock)
@@ -79,11 +81,14 @@ if __name__ == "__main__":
                         if data == "!shutdown":
                             sys.exit()
 
-                        print(data)
+                        elif data == "User ended conversation, press enter to go to main menu or type !shutdown to exit program":
+                            break
 
-                        if data.startswith("Connected with"):
-                            message = receive(client_sock)
-                            print(message)
+                        elif data.startswith("Connected with"):
+                            print(data)
+                            continue
+
+                        print(data)
 
 
                         response = input()
@@ -94,6 +99,10 @@ if __name__ == "__main__":
 
                 if data == "!shutdown":
                     sys.exit()
+
+                elif data == "Wrong input":
+                    print(data)
+                    data = receive(client_sock)
 
                 print(data)
 
