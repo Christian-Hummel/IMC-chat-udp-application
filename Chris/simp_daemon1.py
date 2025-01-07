@@ -188,6 +188,7 @@ class ExampleDaemon:
                     self.daemon_sock.sendto(ack, (address, self.DAEMON_PORT))
                     print(f"Sending back {ack}")
                     self.daemon_connection = True
+                    self.receiver_address = address
                     confirmation = f"Connected with {address}, please enter your message, type !exit to leave conversation"
                     self.daemon_sock.sendto(confirmation.encode("ascii"), (self.host_address, self.CLIENT_PORT))
 
@@ -198,7 +199,7 @@ class ExampleDaemon:
                     self.daemon_sock.sendto(confirmation.encode("ascii"), (self.host_address, self.CLIENT_PORT))
 
                 elif message.operation == b'\x08':
-                    error = f"User with {address}, declined your request"
+                    error = f"User with address {address}, declined your request, press enter to get back to main menu"
                     self.daemon_sock.sendto(error.encode("ascii"), (self.host_address, self.CLIENT_PORT))
                     ack = Datagram(type=1, operation=4, sequence=0, username=self.client_username).bytearray()
                     self.daemon_sock.sendto(ack, (address, self.DAEMON_PORT))
@@ -230,7 +231,9 @@ class ExampleDaemon:
                     self.daemon_sock.sendto(error, (address, self.DAEMON_PORT))
 
                 elif message.operation == b'\x04':
-                    self.daemon_connection = False
+                    # acknowledgement of closed connection or if sender is busy
+                    # self.daemon_connection = False
+                    pass
 
 
                 elif message.operation == b'\x08':
@@ -238,10 +241,11 @@ class ExampleDaemon:
                     ack = Datagram(type=1, operation=4, sequence=0, username=self.client_username).bytearray()
                     print("Sending back ACK")
                     information = "User ended conversation, press enter to go to main menu or type !shutdown to exit program"
-                    self.daemon_sock.sendto(information.encode("ascii"), (self.host_address, self.CLIENT_PORT))
-                    self.daemon_sock.sendto(ack, (address, self.DAEMON_PORT))
                     self.receiver_address = ""
                     self.daemon_connection = False
+                    self.daemon_sock.sendto(information.encode("ascii"), (self.host_address, self.CLIENT_PORT))
+                    self.daemon_sock.sendto(ack, (address, self.DAEMON_PORT))
+
 
     def daemon_listen(self):
         print(f"Listening for messages from daemons on port 7777 ")
@@ -301,13 +305,8 @@ class ExampleDaemon:
 
                     while True:
 
-                        if not self.daemon_connection and self.receiver_address:
 
-                            message = self.client_receive()
-                            print(f"message received: {message}")
-                            self.client_sock.sendto(message.encode("ascii"), (self.ip_address, self.DAEMON_PORT))
-
-                        elif not self.daemon_connection and not self.receiver_address:
+                        if not self.daemon_connection and not self.receiver_address:
                             break
 
 
@@ -318,7 +317,8 @@ class ExampleDaemon:
                                 message = self.client_receive()
 
                                 print(f"received as sender {message}")
-
+                                # needs adjustment as well - this block should only be reached
+                                # if there is no daemon_connection
                                 if message == "!shutdown":
                                     self.client_sock.sendto(message.encode("ascii"),(self.host_address, self.CLIENT_PORT))
                                     self.shutdown = True
@@ -340,9 +340,12 @@ class ExampleDaemon:
 
                     self.client_sock.sendto(b'Wait', (self.ip_address, self.DAEMON_PORT))
 
+                    self.idle = True
+
                     while True:
 
                         if self.idle:
+
 
                             data = self.client_receive()
 
@@ -355,8 +358,8 @@ class ExampleDaemon:
 
                             self.client_sock.sendto(data.encode("ascii"), (self.ip_address, self.DAEMON_PORT))
 
-
-                        elif not self.daemon_connection and not self.receiver_address:
+                        # need to be adjusted, does not work as intended yet
+                        elif not self.idle and not self.receiver_address:
                             break
 
 
@@ -379,7 +382,7 @@ class ExampleDaemon:
 
                     error = b'Wrong input'
                     self.client_sock.sendto(error, (self.host_address, self.CLIENT_PORT))
-                    continue
+
 
         # close socket if self.shutdown gets switched
         self.client_sock.close()
