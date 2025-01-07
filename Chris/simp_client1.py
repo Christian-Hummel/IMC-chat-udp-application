@@ -66,7 +66,6 @@ if __name__ == "__main__":
             while True:
 
                 data = receive(client_sock)
-                print("sender loop")
 
                 # second possibility - User chose to stay idle
                 if data == "Waiting for incoming chat requests, please wait or press q to exit":
