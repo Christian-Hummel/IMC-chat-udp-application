@@ -39,7 +39,6 @@ class Datagram:
         return b''.join([self.type, self.operation, self.sequence, self.username, self.length, self.payload])
 
 
-datagram1 = Datagram(type=2, operation=1, sequence=0, username="Chris", payload="Test_message")
 
 
 class ExampleDaemon:
