@@ -55,13 +55,11 @@ if __name__ == "__main__":
 
 
         daemon_ip_request = sys.argv[1]
-        daemon_ip = "" + daemon_ip_request
-        print(f"daemon_ip_request {daemon_ip_request}")
 
         # Connect client with daemon
         if connect(daemon_ip_request, client_sock):
             print(f"Successfully connected to daemon with ip {daemon_ip_request}")
-
+            daemon_ip = "" + daemon_ip_request
             # General wait for messages
             while True:
 
@@ -109,6 +107,10 @@ if __name__ == "__main__":
                 response = input()
 
                 send(response.encode("ascii"), daemon_ip, client_sock)
+
+
+        else:
+            print("Failed to connect with daemon")
 
 
 
