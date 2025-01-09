@@ -1,7 +1,7 @@
 import socket
 import sys
 import threading
-import keyboard
+
 
 
 # ljust(32, b'0x00') - function to pad username field with zero bytes until 32 is reached
@@ -464,13 +464,22 @@ class ExampleDaemon:
         print(f"host_address = {address}")
 
         if self.connection_request(data, address):
-
-
             user_request = b'Please enter your username'
             self.client_sock.sendto(user_request, (self.host_address, self.CLIENT_PORT))
-            username = self.client_receive()
-            print(f"username {username}")
-            self.client_username = username
+            while not self.client_username:
+
+
+                username = self.client_receive()
+                if len(username) < 33:
+                    self.client_username = username
+                    print(f"username {username}")
+
+                else:
+                    error = b'Invalid username, please insert a username with a maximum of 32 characters'
+                    self.client_sock.sendto(error, (self.host_address, self.CLIENT_PORT))
+                    continue
+
+
 
             if self.chat_request:
 
